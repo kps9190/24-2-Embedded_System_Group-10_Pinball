@@ -1,31 +1,57 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <signal.h>
 #include <pthread.h>
 #include <wiringPi.h>
 #include <softPwm.h>
 #include <softTone.h>
 #include <wiringPiI2C.h>
+#include <ao/ao.h>
+#include <mpg123.h>
+#include <string.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_mixer.h>
+#include <pwd.h>
 
+
+
+
+/* 스피커 */
+#define AUDIO_FILE "ball.mp3"
+
+
+
+volatile int reset_audio_flag = 0; // 스피커 리셋 플래그
+pthread_mutex_t audio_mutex;       // 스피커 플래그 뮤텍스
+pthread_mutex_t gpio_mutex;
 /* lcd */
-#define LCD_ADDR 0x3E
-int lcd;
-static const char* I2C_DEV = "/dev/i2c-1";
+#define LCD_ADDR 0x3E // LCD I2C Address
+#define RGB_ADDR 0x62 // RGB I2C Address
+
+int fd_lcd;
+int fd_rgb;
+
+
 
 /* 초음파 센서 핀 번호 */
 #define TRIG_PIN 12
 #define ECHO_PIN 13
 
+/*점수 깍이는 초음파 센서 핀 번호*/
+#define TRIG_PIN_M 8
+#define ECHO_PIN_M 25
+
+
 /* 버튼 핀 번호 */
-#define BUTTON_PIN 14 // 일반 버튼 핀
-#define RESET_BUTTON_PIN 15 // 리셋 버튼 핀
-#define LEFT_FLIPPER_BUTTON_PIN 26//16 // 왼쪽 플리퍼 버튼
-#define RIGHT_FLIPPER_BUTTON_PIN 17 // 오른쪽 플리퍼 버튼
+//#define BUTTON_PIN 14 // 일반 버튼 핀
+#define RESET_BUTTON_PIN 27 // 리셋 버튼 핀
 
 /* 서보 모터 핀 번호 */
 
-#define LEFT_FLIPPER 19 // 왼쪽 플리퍼 서보 핀
-#define RIGHT_FLIPPER 20 // 오른쪽 플리퍼 서보 핀
-#define SERVO 18 //서보 모터 핀 21 이였음 , 반드시 13,18,19,12만 사용(PWN 사용시)
+//#define SERVO 18 //서보 모터 핀 21 이였음 , 반드시 13,18,19,12만 사용(PWN 사용시)
 
 /* 부저 핀 번호*/
 #define BUZZER 16
@@ -45,23 +71,17 @@ pthread_mutex_t score_mutex; // 점수 뮤텍스
 
 //함수 선언
 void init();
-void init_lcd();
-void lcd_print(const char *str);
-void display_lcd_number(int num);
+void lcd_init(int fd_lcd, int fd_rgb, int r, int g, int b);
+void lcd_clear(int fd_lcd);
+void lcd_print(int fd_lcd, int score);
 
-void init_servo();
-
+int init_audio();
+void* play_audio_thread(void* arg);
+void cleanup_audio();
 void *sonar(void *arg);
 void sonar_read();
-
-void *servo(void *arg);
-void rotate_Servo(float angle);
-
-void *lcd_segment(void *arg);
-
-void *button(void *arg);
-void *vibrationSensor(void *arg);
-
+void sonar_read_m();
+void* execute_survo(void* arg);
 void myTone();
 void led();
 
@@ -69,7 +89,14 @@ void led();
 void init() {
     wiringPiSetupGpio();
 
-    init_lcd();
+    //lcd 초기화
+
+    fd_lcd = wiringPiI2CSetup(LCD_ADDR);
+    fd_rgb = wiringPiI2CSetup(RGB_ADDR);
+
+    lcd_init(fd_lcd, fd_rgb, 0, 0, 255);//lcd & rgb 초기화
+
+    lcd_print(fd_lcd, 0);//
 
     // 초음파 센서 핀 모드 설정
     pinMode(TRIG_PIN, OUTPUT);
@@ -77,7 +104,7 @@ void init() {
     digitalWrite(TRIG_PIN, LOW); // 트리거 핀 초기화
 
     // 서보 모터 초기화
-    init_servo();
+    //init_servo();
 
     // 부저 초기화
     softToneCreate(BUZZER);
@@ -85,111 +112,189 @@ void init() {
     //진동 초기화
     pinMode(VIBRATION_SENSOR_PIN, INPUT);
 
+    //led 초기화
+    pinMode(LED, OUTPUT);
+
+    //reset 초기화
+    pinMode(RESET_BUTTON_PIN, INPUT);
+
+    // music
+    //  if (init_audio() != 0) {
+    //     return; // Initialization failed
+    // }
+
     //  뮤텍스 초기화
     pthread_mutex_init(&score_mutex, NULL);
+    pthread_mutex_init(&gpio_mutex, NULL);
 }
 
-void init_lcd() {
-    lcd = wiringPiI2CSetupInterface(I2C_DEV, LCD_ADDR);
-    if (lcd == -1) {
-        printf("LCD 초기화 실패!\n");
-        return;
-    }
+void lcd_init(int fd_lcd, int fd_rgb, int r, int g, int b) {
 
-    wiringPiI2CWriteReg8(lcd, 0x00, 0x38); // Function set
-    wiringPiI2CWriteReg8(lcd, 0x00, 0x39); // Function set: extension mode
-    wiringPiI2CWriteReg8(lcd, 0x00, 0x14); // Internal OSC frequency
-    wiringPiI2CWriteReg8(lcd, 0x00, 0x70); // Contrast set
-    wiringPiI2CWriteReg8(lcd, 0x00, 0x56); // Power/ICON control/Contrast set
-    wiringPiI2CWriteReg8(lcd, 0x00, 0x6C); // Follower control
-    delay(200);
-    wiringPiI2CWriteReg8(lcd, 0x00, 0x38); // Function set
-    wiringPiI2CWriteReg8(lcd, 0x00, 0x0C); // Display ON
-    wiringPiI2CWriteReg8(lcd, 0x00, 0x01); // Clear display
+    // Initialize RGB
+    wiringPiI2CWriteReg8(fd_rgb, 0x00, 0x00); // Initialization
+
+    wiringPiI2CWriteReg8(fd_rgb, 0x01, 0x00); // Initialization
+    wiringPiI2CWriteReg8(fd_rgb, 0x08, 0xAA); // RGB activation
+
+    wiringPiI2CWriteReg8(fd_rgb, 0x04, r); // RED
+    wiringPiI2CWriteReg8(fd_rgb, 0x03, g); // GREEN
+    wiringPiI2CWriteReg8(fd_rgb, 0x02, b); // BLUE
+
+    // Initialize LCD
+    wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x38); // Function set: 2 lines
+    wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x39); // Function set: Extend instruction set
+    wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x14); // OSC frequency
+    wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x70); // Contrast setting
+    wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x56); // Power/ICON control
+    wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x6C); // Follower control
+    wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x0C); // Display ON
+    wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x01); // Clear display
+    usleep(2000);
+}
+
+void lcd_clear(int fd_lcd) {
+    wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x01);
     delay(2);
 }
 
-void lcd_print(const char *str) {
+void lcd_print(int fd_lcd, int score) {
+    char buffer[32];
+    snprintf(buffer, sizeof(buffer), "score: %d", score);
+    
+    lcd_clear(fd_lcd);
+
+    // Print the formatted string to the LCD
+    const char* str = buffer;
     while (*str) {
-        wiringPiI2CWriteReg8(lcd, 0x40, *str++);
+                wiringPiI2CWriteReg8(fd_lcd, 0x40, *str++);
+        
+        usleep(500);
     }
 }
 
-void display_lcd_number(int num) {
-    char buffer[16];
-    snprintf(buffer, sizeof(buffer), "Score : %d", num);
-    wiringPiI2CWrite(lcd, 0x80);
-    lcd_print(buffer);
+//스피커
+
+pid_t play_mp3_pid = -1; 
+void play_mp3() {
+    
+    if (play_mp3_pid > 0) {
+        printf("Stopping currently running play_mp3 process (PID: %d)...\n", play_mp3_pid);
+        if (kill(play_mp3_pid, SIGTERM) == -1) {  // 
+            perror("Failed to terminate existing play_mp3 process");
+        }
+        waitpid(play_mp3_pid, NULL, 0);  // 
+        play_mp3_pid = -1;
+    }
+
+    pid_t pid = fork();
+
+    if (pid == 0) {  
+        setenv("XDG_RUNTIME_DIR", "/run/user/1000", 1); 
+        setenv("PATH", "/usr/bin:/bin:/usr/sbin:/sbin", 1);
+
+        //
+        if (geteuid() == 0) {
+            struct passwd *pw = getpwnam("pi");
+            if (!pw) {
+                perror("Failed to get user 'pi'");
+                exit(EXIT_FAILURE);
+            }
+            if (setuid(pw->pw_uid) == -1) {
+                perror("Failed to drop privileges");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        // ./play_mp3 
+        execl("./play_mp3", "play_mp3", NULL);
+        perror("Failed to execute ./play_mp3");
+        exit(EXIT_FAILURE);
+    } else if (pid > 0) {  
+        play_mp3_pid = pid;  
+        printf("Started play_mp3 process (PID: %d)\n", play_mp3_pid);
+    } else {
+        perror("Failed to fork");
+    }
 }
 
-//서보모터 초기화
-void init_servo() {
-    pinMode(SERVO, PWM_OUTPUT);
-    pwmSetMode(PWM_MODE_MS);
-    pwmSetRange(2000);
-    pwmSetClock(192);
-    //pwmWrite(SERVO, 150);
-}
 
+int testcnt=0;
+int power_error=0;
 // 거리 측정
 void sonar_read() {
+    power_error=0;
+    pthread_mutex_lock(&gpio_mutex);
+    //초음파 신호 발사 
+    //printf("%d\n",testcnt++);
     digitalWrite(TRIG_PIN, HIGH);
-    delay(10); // 10 마이크로초 대기
+    usleep(20); // 10 마이크로초 대기
     digitalWrite(TRIG_PIN, LOW);
 
-    while (digitalRead(ECHO_PIN) == LOW);
+     long timeout = micros() + 20000; // 20ms 
+    while (digitalRead(ECHO_PIN) == LOW && micros() < timeout);
+
+    if (micros() >= timeout) {
+        printf("Timeout waiting for ECHO_PIN to go HIGH\n");
+        power_error=1;
+        //return;
+    }
+
     long start_time = micros();
-    while (digitalRead(ECHO_PIN) == HIGH);
+    timeout = micros() + 20000; // 20ms
+    while (digitalRead(ECHO_PIN) == HIGH && micros() < timeout);
+
+    if (micros() >= timeout) {
+        printf("Timeout waiting for ECHO_PIN to go LOW\n");
+        power_error=1;
+        //return;
+    }
+
     long travel_time = micros() - start_time;
 
     int distance = travel_time / 58; // cm
-    //printf("%d\n", distance);
-    if (distance <= 5) { // 5cm 이내에 물체가 인식되면
+
+    printf("sonar read %d\n", distance);
+
+    if(power_error==1) {
+        distance = 100;
+        printf("power error\n");
+    }
+
+    if(distance<=2) distance = 100;
+
+    pthread_mutex_unlock(&gpio_mutex);
+    if (distance <= 6) { // 5cm 이내에 물체가 인식되면
+
         pthread_mutex_lock(&score_mutex); // 뮤텍스 잠금
         score++; // 점수 증가
+        lcd_print(fd_lcd, score);
+        printf("Score: %d\n", score);//밖으로 빼도 되긴함
+        pthread_mutex_unlock(&score_mutex); // 뮤텍스 잠금 해제
+
+        
         led();
         myTone();
-        printf("Score: %d\n", score);
-        pthread_mutex_unlock(&score_mutex); // 뮤텍스 잠금 해제
 
     }
 }
 
 // 초음파 센서
 void *sonar(void *arg) {
+    int dynamic_delay = 3000; //3s
+    int save_score;
     while (1) {
+        save_score = score;
         sonar_read();
-        delay(50); // 0.1초 대기
+        if(save_score == score)//ball not pass 50ms
+            dynamic_delay =50;
+        else
+            dynamic_delay = 1000; //ball pass 3s
+        delay(dynamic_delay);
     }
     return NULL;
 }
 
-// 회전 트랩
-void rotate_Servo(float angle){
-    
-    if (angle > 90.0) { printf("90도가 초과되었습니다 -> 90도로 조절합니다.\n"); angle = 90.0; }
-    else if (angle < -90.0) { printf("-90도 미만입니다. -> -90도로 조절합니다.\n"); angle = -90.0; }
-    
-    int rotate = (int)(angle * (100./90.)) + 150;  
-    //printf("%.4fms\n", ((float)rotate)/100.);
-    pwmWrite(SERVO, rotate);
-}
 
-// 서보 모터 계속 돌리기
-void *servo(void *arg) {
-
-    while (1) {
-        rotate_Servo(0.);
-        delay(1000);
-        rotate_Servo(90.);
-        delay(1000);
-        rotate_Servo(0.);
-        delay(1000);
-        rotate_Servo(-90.);
-        delay(1000);
-    }
-    return NULL;
-}
 
 //부저 소리
 void myTone() {
@@ -198,39 +303,19 @@ void myTone() {
     softToneWrite(BUZZER, 0);
 }
 
-// lcd세그먼트 사용
-void *lcd_segment(void *arg) {
-    while (1) {
-        pthread_mutex_lock(&score_mutex); // 뮤텍스 잠금
-        display_lcd_number(score); // 현재 점수 표시
-        pthread_mutex_unlock(&score_mutex); // 뮤텍스 잠금 해제
-        delay(500); // 100ms 대기
-        //printf("\n");
-    }
-    return NULL;
-}
-
-// 버튼 핸들러
-void *button(void *arg) {
-    while (1) {
-        if (digitalRead(BUTTON_PIN) == LOW) {
-            pthread_mutex_lock(&score_mutex);
-            score++; // 점수 리셋
-            led();
-            myTone();
-            printf("Score: %d\n", score);
-            pthread_mutex_unlock(&score_mutex);
-            delay(250); // 버튼이 눌린 동안 대기
-        }
-    }
-}
-
-//리셋 버튼
+//리셋 버튼 
 void *reset(void *arg) {
+    //static pthread_t audioThread;
+
     while(1) {
         if (digitalRead(RESET_BUTTON_PIN) == LOW) {
+            printf("Reset button pressed\n");
+            play_mp3();
+        
+
             pthread_mutex_lock(&score_mutex);
             score = 0; // 점수 리셋
+            lcd_print(fd_lcd, score);
             pthread_mutex_unlock(&score_mutex);
 
             printf("reset\n");
@@ -241,7 +326,6 @@ void *reset(void *arg) {
 }
 
 void led() {
-    pinMode(LED, OUTPUT);
 
     if (ledflag == 0)
     {
@@ -255,48 +339,46 @@ void led() {
     
 }
 
-void *vibrationSensor(void *arg) {
-    while (1) {
-        if (digitalRead(VIBRATION_SENSOR_PIN) == HIGH) { //  진동 감지
-            pthread_mutex_lock(&score_mutex); // 점수 데이터 보호
-            score++; //  점수 증가
-            pthread_mutex_unlock(&score_mutex);
 
-            led(); // LED 작동
-            myTone(); //  부저 소리
-            printf("Vibration Detected! Score: %d\n", score);
-            delay(500); //  디바운스 딜레이
-        }
-        delay(50); //   짧은 대기 시간
+void* execute_survo(void* arg) {
+
+    //rsa error 
+    int ret = system("sshpass -p 'qwerty' ssh -o StrictHostKeyChecking=no pi@192.168.43.106 'sudo /home/pi/survo/survo'");      //ip는 경우에 따라 바뀜
+    if (ret != 0) {
+        printf("Error: Failed to execute survo (return code: %d)\n", ret);
+    } else {
+        printf("survo executed successfully.\n");
     }
+    //survo terminate
+    //system("ssh pi@192.168.0.26 'pkill -f /home/pi/survo/survo'");
     return NULL;
 }
-
 
 // 메인 함수
 int main() {
     init();
+    play_mp3();
+    
+    
 
-    pthread_t sonarThread, servoThread, segmentThread, buttonThread, resetThread, filperThread, vibrationThread;//, myToneThread;
+    pthread_t sonarThread, buttonThread, resetThread, servoThread; //audioThread;
 
-    // 스레드 생성
+    // Create threads
     pthread_create(&sonarThread, NULL, sonar, NULL);
-    pthread_create(&servoThread, NULL, servo, NULL);
-    pthread_create(&segmentThread, NULL, lcd_segment, NULL);
-    pthread_create(&buttonThread, NULL, button, NULL);
-    //pthread_create(&resetThread, NULL, reset, NULL);
-    pthread_create(&vibrationThread, NULL, vibrationSensor, NULL);
+    pthread_create(&resetThread, NULL, reset, NULL);
+    //pthread_create(&audioThread, NULL, audio_thread_func, NULL); // Start audio thread
 
-    // 다른 작업도 수행
+    // Join threads (this ensures the program waits for threads to complete before terminating)
     pthread_join(sonarThread, NULL);
     pthread_join(servoThread, NULL);
-    pthread_join(segmentThread, NULL);
-    pthread_join(buttonThread, NULL);
     pthread_join(resetThread, NULL);
-    pthread_join(vibrationThread, NULL);
+    //pthread_join(audioThread, NULL); // Wait for the audio thread to finish
 
-    // 뮤텍스 자원 해제
+    // Cleanup
     pthread_mutex_destroy(&score_mutex);
+    pthread_mutex_destroy(&audio_mutex);
+
+    //cleanup_audio();  // Release SDL audio resources
 
     return 0;
 }
