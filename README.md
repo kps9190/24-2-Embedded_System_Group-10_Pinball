@@ -472,6 +472,7 @@
 
 ---
 
+최종 영상 : https://drive.google.com/file/d/14ocFdvG7KlYg8Bv7X7S0CzXEyx_R3Vwc/view?usp=sharing
 
 최종발표에 사용된 프레젠테이션 파일은 
 https://1drv.ms/p/c/b826fcfcce360823/EfU9jbzG73ZIri-toj1JGh0BeaA6BwlzsAelqIpkgt1cMQ?e=Nrdrhc
