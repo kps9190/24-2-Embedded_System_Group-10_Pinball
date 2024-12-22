@@ -16,13 +16,8 @@
 #include <SDL2/SDL_mixer.h>
 #include <pwd.h>
 
-
-
-
 /* 스피커 */
 #define AUDIO_FILE "ball.mp3"
-
-
 
 volatile int reset_audio_flag = 0; // 스피커 리셋 플래그
 pthread_mutex_t audio_mutex;       // 스피커 플래그 뮤텍스
@@ -33,8 +28,6 @@ pthread_mutex_t gpio_mutex;
 
 int fd_lcd;
 int fd_rgb;
-
-
 
 /* 초음파 센서 핀 번호 */
 #define TRIG_PIN 12
@@ -63,8 +56,6 @@ int ledflag = 0;
 /*진동 모듈 센서*/
 #define VIBRATION_SENSOR_PIN 21
 
-
-
 /* 점수 및 뮤텍스 */
 volatile int score = 0; // 점수 저장
 pthread_mutex_t score_mutex; // 점수 뮤텍스
@@ -75,15 +66,13 @@ void lcd_init(int fd_lcd, int fd_rgb, int r, int g, int b);
 void lcd_clear(int fd_lcd);
 void lcd_print(int fd_lcd, int score);
 
-int init_audio();
-void* play_audio_thread(void* arg);
-void cleanup_audio();
-void *sonar(void *arg);
+void play_mp3();
 void sonar_read();
-void sonar_read_m();
-void* execute_survo(void* arg);
+void* sonar(void* arg);
 void myTone();
+void* reset(void* arg);
 void led();
+void* execute_survo(void* arg);
 
 //초기화
 void init() {
@@ -173,7 +162,6 @@ void lcd_print(int fd_lcd, int score) {
 }
 
 //스피커
-
 pid_t play_mp3_pid = -1; 
 void play_mp3() {
     
@@ -220,6 +208,7 @@ void play_mp3() {
 
 int testcnt=0;
 int power_error=0;
+
 // 거리 측정
 void sonar_read() {
     power_error=0;
@@ -270,7 +259,6 @@ void sonar_read() {
         lcd_print(fd_lcd, score);
         printf("Score: %d\n", score);//밖으로 빼도 되긴함
         pthread_mutex_unlock(&score_mutex); // 뮤텍스 잠금 해제
-
         
         led();
         myTone();
@@ -294,8 +282,6 @@ void *sonar(void *arg) {
     return NULL;
 }
 
-
-
 //부저 소리
 void myTone() {
     softToneWrite(BUZZER, 440);
@@ -305,7 +291,6 @@ void myTone() {
 
 //리셋 버튼 
 void *reset(void *arg) {
-    //static pthread_t audioThread;
 
     while(1) {
         if (digitalRead(RESET_BUTTON_PIN) == LOW) {
@@ -339,7 +324,6 @@ void led() {
     
 }
 
-
 void* execute_survo(void* arg) {
 
     //rsa error 
@@ -359,26 +343,20 @@ int main() {
     init();
     play_mp3();
     
-    
-
-    pthread_t sonarThread, buttonThread, resetThread, servoThread; //audioThread;
+    pthread_t sonarThread, buttonThread, resetThread, servoThread;
 
     // Create threads
     pthread_create(&sonarThread, NULL, sonar, NULL);
     pthread_create(&resetThread, NULL, reset, NULL);
-    //pthread_create(&audioThread, NULL, audio_thread_func, NULL); // Start audio thread
 
     // Join threads (this ensures the program waits for threads to complete before terminating)
     pthread_join(sonarThread, NULL);
     pthread_join(servoThread, NULL);
     pthread_join(resetThread, NULL);
-    //pthread_join(audioThread, NULL); // Wait for the audio thread to finish
 
     // Cleanup
     pthread_mutex_destroy(&score_mutex);
     pthread_mutex_destroy(&audio_mutex);
-
-    //cleanup_audio();  // Release SDL audio resources
 
     return 0;
 }
