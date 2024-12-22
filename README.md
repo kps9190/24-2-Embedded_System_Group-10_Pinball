@@ -37,29 +37,28 @@
 
 
 
-소프트웨어적인 구성의 경우, main 함수의 경우 LCD, 서보모터 실행, 음악, 버저, LED를 담당하는 함수로 구성되어 있습니다.
+소프트웨어적인 구성의 경우, main 함수의 경우 LCD, 서보모터 실행, 음악, 수동버저, LED를 담당하는 함수로 구성되어 있습니다.
 
-먼저 LCD를 담당하는 함수를 
+먼저 LCD를 담당하는 코드를 
 void lcd_init(int fd_lcd, int fd_rgb, int r, int g, int b);
 void lcd_clear(int fd_lcd);
 void lcd_print(int fd_lcd, int score);
 과 같이 구성하였고
 
-배경음악을 담당하는 함수를
+배경음악을 담당하는 코드를
 int init_audio();
 void* play_audio_thread(void* arg);
 void cleanup_audio();
 다음과 같이 구성하였습니다.
 
-초음파센서를 담당하는 함수를
+초음파센서를 담당하는 코드를
 void *sonar(void *arg);
 void sonar_read();
 void sonar_read_m();
 다음과 같이 구현하였고,
 
 서보모터의 경우
-void* execute_survo(void* arg);
-를 통해 명령을 보내 서보모터를 실행하도록 구성하였습니다.
+void* execute_survo(void* arg); 코드를 를 통해 다른 라즈베리파이로 명령을 보내 서보모터를 실행하도록 구성하였습니다.
 
 수동버저는
 void myTone();
@@ -95,11 +94,9 @@ void rotate_Servo(float angle){
     int rotate = (int)(angle * (100./90.)) + 150;
     pwmWrite(SERVO, rotate);
 }
+해당 코드를 통해 서보모터 회전 각도를 -90도에서 +90도, 총 180도 내에서만 구동되도록 하였으며, 혹시 의도치않게 범위를 넘는 경우 이를 범위 내로 재 조정하도록 하였습니다.
 
-코드를 통해 서보모터 회전 각도를 -90도에서 +90도, 총 180도 내에서만 구동되도록 하였으며, 혹시 의도치않게 범위를 넘는 경우 이를 범위 내로 재 조정하는 코드 역시 삽입해 두었습니다.
-
-
-게임 내에서 서보모터가 동작하는 코드는 다음과 같습니다.
+위 설정값을 바탕으로 게임 내에서 서보모터가 동작하는 코드는 다음과 같습니다.
 void *servo(void *arg) {
     while (1) {
         rotate_Servo(0.);
@@ -119,17 +116,24 @@ void *servo(void *arg) {
 해당 서보모터는 주 라즈베리파이에서 핀볼 코드 실행시
 void* execute_survo(void* arg) {
     int ret = system("sshpass -p 'qwerty' ssh -o StrictHostKeyChecking=no pi@192.168.43.106 'sudo /home/pi/survo/survo'");
+    
 execute_servo를 통해서 동일 네트워크에 접속해있는 다른 라즈베리파이로 SSH 명령어를 보내서 다른 라즈베리파이의  /home/pi/survo/survo에 있는 코드를 실행하도록 하였습니다.
 이번 실습에서는 휴대폰에서 핫스팟을 켠 후 두 대의 파이를 한대의 핫스팟에 접속시켜서 동일 네트워크로 묶은 후에 명령을 보내는 방식을 사용하였습니다.
 
 
+-1602 LCD-
+LCD와 라즈베리파이는 I2C 인터페이스로 연결되어 있으며, 
 
-1602 LCD를 담당하는 코드는 다음과 같습니다.
+먼저 LCD의 화면을 초기화 하는 코드입니다.
+
 void lcd_clear(int fd_lcd) {
     wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x01);
     delay(2);
 }
-만약 LCD의 표시된 화면을 지워야 
+
+LCD 초기화 명령이 실행되면, LCD에 0x01이라는, LCD의 초기화를 담당하는 명령을 보내서 화면을 초기화하게 됩니다.
+
+LCD의 화면 출력을 담당하는 코드입니다.
 
 void lcd_print(int fd_lcd, int score) {
     char buffer[32];
@@ -148,7 +152,7 @@ void lcd_print(int fd_lcd, int score) {
 
 
 배경음악 재생을 담당하는 코드는 다음과 같습니다.
-별도의 
+라즈베리파이 저장소에 저장된 별도의 play_mp3라는 파일을 불러들여서 재생되도록 하였습니다.
 pid_t play_mp3_pid = -1; 
 void play_mp3() {
     
@@ -179,8 +183,7 @@ void play_mp3() {
                 exit(EXIT_FAILURE);
             }
         }
-
-        // ./play_mp3 
+ 
         execl("./play_mp3", "play_mp3", NULL);
         perror("Failed to execute ./play_mp3");
         exit(EXIT_FAILURE);
@@ -191,7 +194,6 @@ void play_mp3() {
         perror("Failed to fork");
     }
 }
-
 
 int testcnt=0;
 int power_error=0;
@@ -237,9 +239,8 @@ void sonar_read() {
 
     if(distance<=2) distance = 100;
 
-    pthread_mutex_unlock(&gpio_mutex);
-
-
+    pthread_mutex_unlock(&gpio_mutex)
+    
     점수가 오르는 기준은 초음파 센서에서 5CM 이내에 물체가 인식되는지를 확인하는 방식입니다.
     만약 5CM이내에서 물체가 인식이 되는 경우(distance <= 6)
 
@@ -268,9 +269,7 @@ void *sonar(void *arg) {
 
 초음파 센서에서 물체를 감지하는 경우
 
-
 void led() {
-해당 코드를 통해서 LED가 점멸되는 방식으로 점수 획득에 대한 시각적인 효과를 제공하도록 구성하였습니다.
     if (ledflag == 0)
     {
         digitalWrite(LED, HIGH);
@@ -280,35 +279,47 @@ void led() {
         digitalWrite(LED, LOW);
         ledflag = 0;
     }
-점수 획득시 부저에서 소리가 나도록 하는 코드는 다음과 같습니다.
-void myTone() {
-    softToneWrite(BUZZER, 440);
-    delay(500);
-    softToneWrite(BUZZER, 0);
-}
-해당 코드를 통해서 점수 획득시 
+ 
+해당 코드를 통해서 LED의 Flag를 조절하는 방식으로 점수 획득에 대한 시각적인 효과를 제공하도록 구성하였습니다.
 
-리셋 버튼을 담당하는 코드는 다음과 같습니다.
+void myTone()에서 점수값에 변동(점수의 상승)이 있을 때, softToneWrite(BUZZER, 440);를 통해서 440Hz의 소리가 재생되도록 하였습니다.
+
+재설정 버튼은 하기 제시된 *reset에서 담당하게 되는데, 
 void *reset(void *arg) {
     while(1) {
-        if (digitalRead(RESET_BUTTON_PIN) == LOW) {
-만약 버튼이 눌린것을 감지하면
-            play_mp3(); 
+        if (digitalRead(RESET_BUTTON_PIN) == LOW)를 통해서 버튼이 눌린것을 감지하면, play_mp3();를 통해서 배경음악 재생 함수를 호출해서 배경음악이 처음부터 재생되도록 하였고, 
 음악을 처음부터 재생해도록 하였고
+
         
-pthread_mutex_lock(&score_mutex);
-            score = 0;
-            lcd_print(fd_lcd, score);
-            pthread_mutex_unlock(&score_mutex);
-  를 통해서 점수에 뮤텍스 잠금을 걸고 점수를 0점으로 초기화 하고 LCD에 표시되는 점수를 새로고침하고나서 점수 뮤텍스의 잠금을 해제하도록 함으로써 점수에 대한 다른 코드의 임의 접근을 차단하도록 하였습니다.
-            delay(500);
-        }
-        delay(50);
-    }
+pthread_mutex_lock(&score_mutex);를 통해서 점수에 뮤텍스 잠금을 걸고, score = 0;을 통해서 점수를 0점으로 설정하고, lcd_print(fd_lcd, score);를 통해서 갱신 된 점수가 LCD에 표기되도록 하고 마지막으로 pthread_mutex_unlock(&score_mutex);를 통해서 점수 뮤텍스에 걸려 있던 잠금을 해제하도록 하였습니다. 
+를
+점수에 뮤텍스 잠금을 걸고, 점수를 0점으로 초기화 하고 LCD에 표시되는 점수를 현재 점수의 값(0점)에 맞게 갱신하고 점수 뮤텍스의 잠금을 해제하도록 구성하였습니다.
+이를 통해서 점수가 초기화 되는 과정에서 다른 변수가 점수에 개입되는것을 막아 0점의 무결성이 유지되도록 하였습니다.
+
+
+
+int main() {
+    init();
+    play_mp3();
+    pthread_t sonarThread, buttonThread, resetThread, servoThread; //audioThread;
+    
+    pthread_create(&sonarThread, NULL, sonar, NULL);
+    pthread_create(&resetThread, NULL, reset, NULL);
+    pthread_join(sonarThread, NULL);
+    pthread_join(servoThread, NULL);
+    pthread_join(resetThread, NULL);
+
+    
+    pthread_mutex_destroy(&score_mutex);
+    pthread_mutex_destroy(&audio_mutex);
+    
+    return 0;
 }
 
+Main함수 구성은 다음과 같습니다.
+코드가 실행되면, 초음파 센서를 사용하는 sonar, 리셋 버튼을 처리하는 reset 같은 작업들을 실행할 각각의 스레드를 만들어서 실행합니다. 
 
-
+이렇게 만든 스레드들은 동시에 동작하며 서로 간섭하지 않고 독립적으로 실행됩니다. 마지막으로 프로그램이 종료되기 전, 사용한 뮤텍스를 정리하여 프로그램이 깔끔하게 마무리되도록 합니다.
 
 
 
