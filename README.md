@@ -73,17 +73,19 @@ void led();
 서보모터의 경우 별도의 servo.c 파일로 구성해서 다른 라즈베리파이에서 담당하도록 구현하였습니다. 이는 한 대의 파이에서 구동하기에는 GPIO PIN의 부족 문제와 전력 부족 문제때문입니다.
 
 서보모터의 실행을 담당하는 코드는 다음과 같습니다.
-
+```c
 void init_servo() {
     pinMode(SERVO, PWM_OUTPUT);
     pwmSetMode(PWM_MODE_MS);
     pwmSetRange(2000);
     pwmSetClock(192);
 }
+```
 
 표준 서보모터의 설정값인, PWM 동작모드는 마크-스페이스 모드, 듀티 사이클은 2,000에 클럭은 50Hz입니다.
 
 서보모터의 회전 코드는 하기 내용과 같습니다.
+```c
 void rotate_Servo(float angle){
     if (angle > 90.0) {
         angle = 90.0;
@@ -94,9 +96,11 @@ void rotate_Servo(float angle){
     int rotate = (int)(angle * (100./90.)) + 150;
     pwmWrite(SERVO, rotate);
 }
+```
 해당 코드를 통해 서보모터 회전 각도를 -90도에서 +90도, 총 180도 내에서만 구동되도록 하였으며, 혹시 의도치않게 범위를 넘는 경우 이를 범위 내로 재 조정하도록 하였습니다.
 
 위 설정값을 바탕으로 게임 내에서 서보모터가 동작하는 코드는 다음과 같습니다.
+```c
 void *servo(void *arg) {
     while (1) {
         rotate_Servo(0.);
@@ -110,11 +114,12 @@ void *servo(void *arg) {
     }
     return NULL;
 }
+```
 서보모터의 회전이 1초 간격으로 0도 -> 90도 -> 0도 -> -90도 -> 0도로 해서 한번에 90도씩 회전하도록 하였습니다.
 
 
 이렇게 구동되도록 맞추어진 서보모터는,
-
+```c
 int main() {
     init();
     pthread_t servoThread; 
@@ -122,17 +127,18 @@ int main() {
     pthread_join(servoThread, NULL);
     return 0;
 }
+```
 
 해당 코드를 통해 서보모터 구동을 위한 스레드를 만든후에 구동되도록 하였습니다.
 
 이 서보모터는 
 해당 서보모터는 주 라즈베리파이에서 핀볼 코드 실행시 실행되는, 아래에 있는 execute_servo코드를 실행해서
-
+```c
 void* execute_survo(void* arg) {
     int ret = system("sshpass -p 'qwerty' ssh -o StrictHostKeyChecking=no pi@192.168.43.106 'sudo /home/pi/survo/survo'");
     return NULL;
 }
-
+```
 execute_servo를 통해서 동일 네트워크에 접속해있는 다른 라즈베리파이로 SSH 명령어를 보내서 다른 라즈베리파이의  /home/pi/survo/survo에 있는 코드를 실행하도록 하였습니다.
 이번 시연에서는 휴대폰에서 핫스팟을 켠 후 두 대의 파이를 한대의 핫스팟에 접속시켜서 동일 네트워크로 묶은 후에 명령을 보내는 방식을 사용하였습니다.
 
@@ -143,17 +149,18 @@ LCD와 라즈베리파이는 I2C 인터페이스로 연결되어 있으며, {무
 
 
 먼저 LCD의 화면을 초기화 하는 코드입니다.
-
+```c
 void lcd_clear(int fd_lcd) {
     wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x01);
     delay(2);
 }
+```
 
 LCD 초기화 명령이 실행되면, LCD에 0x01이라는, LCD의 초기화를 담당하는 명령을 보내서 화면을 초기화하게 됩니다.
 
 이렇게 초기화 하고 난 LCD에 점수를 기록하기 위해서는 화면 출력을 담당하는 별도의 코드가 필요한데, 이는 lcd_print()에서 담당하게 됩니다.
 하기 코드는 초기화 된 LCD에 화면 출력을 담당하는 코드입니다.
-
+```c
 void lcd_print(int fd_lcd, int score) {
     char buffer[32];
     snprintf(buffer, sizeof(buffer), "score: %d", score);
@@ -167,6 +174,7 @@ void lcd_print(int fd_lcd, int score) {
         usleep(500);
     }
 }
+```
 
 {화면출력이 이루어지는 방식을 설명하도록}
 
@@ -174,7 +182,7 @@ void lcd_print(int fd_lcd, int score) {
 -배경음악-
 게임이 시작되면 play_mp3()를 호출해서 배경음악이 재생되도록 하였습니다.
 배경음악 재생을 담당하는 코드는 다음과 같습니다.
-
+```c
 pid_t play_mp3_pid = -1; 
 void play_mp3() {
     
@@ -217,6 +225,7 @@ void play_mp3() {
         perror("Failed to fork");
     }
 }
+```
 
 {배경음악이 재생되는 방식을 설명하도록}
 라즈베리파이 저장소에 저장된 별도의 play_mp3라는 파일을 불러들여서 재생되도록 하였습니다.
@@ -225,7 +234,7 @@ void play_mp3() {
 
 -초음파 센서-
 초음파 센서의 종합적인 구동을 담당하는 코드는 다음과 같습니다.
-
+```c
 void *sonar(void *arg) {
     int dynamic_delay = 3000; //3s
     int save_score;
@@ -240,11 +249,11 @@ void *sonar(void *arg) {
     }
     return NULL;
 }
-
+```
 {종합적인 구동 설명}
 
 여기서 초음파 센서에서 물체의 감지를 담 sonar_read()를 담당하는 코드는 다음과 같습니다.
-
+```c
 void sonar_read() {
     power_error=0;
     pthread_mutex_lock(&gpio_mutex);
@@ -299,7 +308,7 @@ void sonar_read() {
 
     }
 }
-
+```
 {sonar read와 관련된 설명, 초음파센서가 어떻게 물체를 감지하는지 등등
 
  하기 내용은 아직 정리가 안된 부분이지만 일단 적어둠
@@ -322,7 +331,7 @@ LED가 점등되고 수동 버저에서 소리가 재생되도록 하였습니�
 
 -LED-
 LED의 점멸을 담당하는 코드는 다음과 같습니다.
-
+```c
 void led() {
     if (ledflag == 0)
     {
@@ -333,26 +342,27 @@ void led() {
         digitalWrite(LED, LOW);
         ledflag = 0;
     }
+```
     
 해당 코드를 통해서 LED의 Flag를 조절하는 방식으로 점수 획득에 대한 시각적인 효과를 제공하도록 구성하였습니다.
 
 
 -수동버저-
 점수 획득시 수동버저가 울리도록 담당한 코드는 다음과 같습니다.
-
+```c
 void myTone() {
     softToneWrite(BUZZER, 440);
     delay(500);
     softToneWrite(BUZZER, 0);
 }
-
+```
 myTone()이 호출(점수의 상승)되는 경우, 440Hz의 소리가 재생되도록 하였습니다.
 
 
 
 -재설정-
 재설정을 담당하는 코드는 다음과 같습니다.
-
+```c
 void *reset(void *arg) {
     //static pthread_t audioThread;
 
@@ -372,7 +382,7 @@ void *reset(void *arg) {
         delay(50);
     }
 }
-
+```
 (digitalRead(RESET_BUTTON_PIN) == LOW)를 통해서 버튼이 눌린것을 감지하면, play_mp3();를 통해서 배경음악 재생 함수를 호출해서 배경음악이 처음부터 재생되도록 하였고,        
 pthread_mutex_lock(&score_mutex);를 통해서 점수에 뮤텍스 잠금을 걸고, score = 0;을 통해서 점수를 0점으로 설정하고, lcd_print(fd_lcd, score);를 통해서 갱신 된 점수가 LCD에 표기되도록 하고 마지막으로 pthread_mutex_unlock(&score_mutex);를 통해서 점수 뮤텍스에 걸려 있던 잠금을 해제하도록 하였습니다. 
 점수에 뮤텍스 잠금을 걸고, 점수를 0점으로 초기화 하고 LCD에 표시되는 점수를 현재 점수의 값(0점)에 맞게 갱신하고 점수 뮤텍스의 잠금을 해제하도록 구성하였습니다.
@@ -381,7 +391,7 @@ pthread_mutex_lock(&score_mutex);를 통해서 점수에 뮤텍스 잠금을 걸
 
 
 -종합-
-
+```c
 int main() {
     init();
     play_mp3();
@@ -399,6 +409,7 @@ int main() {
     
     return 0;
 }
+```
 
 Main함수 구성은 다음과 같습니다.
 코드가 실행되면, 초음파 센서를 사용하는 sonar, 리셋 버튼을 처리하는 reset 같은 작업들을 실행할 각각의 스레드를 만들어서 실행합니다. 
