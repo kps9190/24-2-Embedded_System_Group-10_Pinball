@@ -1,24 +1,60 @@
 # Pinball
 임베디드 시스템 팀 프로젝트 10조 Pinball과 관련된 GitHub 저장소입니다.
 
+---
 
+## 개요
 
-핀볼 프로그램은 크게 소프트웨어와 하드웨어 두 부분으로 나뉩니다.
+핀볼 프로그램은 크게 **소프트웨어**와 **하드웨어** 두 부분으로 나뉩니다.
 
-먼저 하드웨어 부분의 경우, 이 프로젝트를 위해 사용된 센서의 경우 SR04 초음파센서 1개, LED 1개, 서보모터 3개, 블루투스 스피커,택트 스위치 1개, 1602 LCD 1개, 수동 버저 1개입니다. 
-총 2대의 라즈베리파이를 사용하였으며, 두 대 모두 학교에서 제공하는 키트에  제공되는 GPIO 확장 키트를 장착하였습니다.
-그 외 게임판을 위해서 고무줄 여러개, 장애물과 플리퍼를 구성하기 위한 우드락, 나무젓가락 여러개와 택배상자를 사용하였으며, 게임용 공으로 가벼운 구슬을 사용하였습니다.
+### 하드웨어 구성
 
-소프트웨어적인 부분으로는 시작점이자 게임의 대부분 기능이 담긴 main.c코드와 저전력 문제와 선 부족 문제로 인해 다른 Pi에서 구동되도록 별도로 분리시킨 servo.c로 구성되어 있습니다.
+- **사용된 센서 및 부품**
+  - SR04 초음파 센서 1개
+  - LED 1개
+  - 서보모터 3개
+  - 블루투스 스피커
+  - 택트 스위치 1개
+  - 1602 LCD 1개
+  - 수동 버저 1개
+    
+- **라즈베리파이**: 총 2대 (GPIO 확장 키트 사용)
+  
+- **게임판 구성**
+  - 고무줄, 우드락, 나무젓가락, 택배상자
+  - 가벼운 구슬 (게임용 공)
 
+### 소프트웨어 구성
 
+- **Main 코드**: `main.c`
+  - 게임의 대부분 기능 포함
+    
+- **서보모터 제어 코드**: `servo.c`
+  - GPIO 핀 및 전력 부족 문제 해결을 위해 별도 분리
 
-게임 방식은 다음과 같습니다.
+---
 
-1. 발사대에 있는 나무젓가락을 뒤로 당긴 후 놓아서 공을 발사합니다.
-2. 발사된 공이 게임판 좌측에 있는 초음파 센서를 지날때마다 점수가 오릅니다.
-3. 공이 플리퍼 아래로 떨어지면 게임이 종료됩니다.
-4. 노란색 택트 스위치를 눌러서 점수를 초기화하고 음악을 처음부터 다시 재생합니다.
+## 게임 방식
+
+1. **공 발사**: 발사대 나무젓가락을 뒤로 당긴 후 놓아서 공 발사.
+2. **점수 획득**: 초음파 센서를 지날 때마다 점수 증가.
+3. **플리퍼 작동**: 물리적으로 바를 밀어 넣어 플리퍼를 작동
+4. **게임 종료**: 공이 플리퍼 아래로 떨어지면 게임 종료.
+5. **점수 초기화**: 노란색 택트 스위치를 눌러 점수 초기화 및 음악을 다시 재생.
+
+---
+
+## 하드웨어 설계
+
+| 구성 요소      | 상세 설명                                                                 |
+|----------------|------------------------------------------------------------------------|
+| **발사대**      | 나무젓가락과 고무줄 사용. 충분한 힘을 제공하기 위해 전자식 대신 수동 설계.          |
+| **플리퍼**      | 고무줄 장력을 이용해 나무젓가락으로 제작. 장애물과 플리퍼를 우드락 및 서보모터로 구성.  |
+| **초음파 센서**  | 게임판 왼쪽 중앙에 설치. 물체 감지 시 LED 점등 및 버저 소리 발생.                   |
+| **LCD 화면**    | 점수 표시를 위해 I2C 인터페이스로 연결.                                        |
+| **서보모터**        | 게임을 하는 동안 서보모터를 동작하여 움직임                                  |
+| **음악 재생**    | 블루투스 스피커 사용. 게임판 내 빈 공간에 배치.                                   |
+| **버튼**        | 점수 초기화를 위한 독립 버튼 (브레드보드에 연결).                                  |
 
 
 게임이 다소 단조롭게 구성이 되어있다 느끼실 수 있습니다. 그 이유는 다음과 같습니다.
@@ -35,390 +71,406 @@
 공이 지나가는것을 감지하는 LED를 근처에 배치함으로써 점수의 출처를 쉽게 알 수 있도록 하였고, 공이 지나가는것을 감지하면 별도의 위치에 있는 수동 버저에서 소리가 나도록 구성하였습니다.
 게임점수 초기화에 사용하는 버튼의 경우 게임판과는 독립된 위치에 브레드보드를 이용해서 구현하였습니다.
 
+---
 
+## 소프트웨어 구성
 
-소프트웨어적인 구성의 경우, main 함수의 경우 LCD, 서보모터 실행, 음악, 수동버저, LED를 담당하는 함수로 구성되어 있습니다.
+### 주요 함수 (test.c)
 
-먼저 LCD를 담당하는 코드를 
-void lcd_init(int fd_lcd, int fd_rgb, int r, int g, int b);
-void lcd_clear(int fd_lcd);
-void lcd_print(int fd_lcd, int score);
-과 같이 구성하였고
+| 함수 이름              | 설명                                                                 |
+|-----------------------|--------------------------------------------------------------------|
+| `init()`              | 전반적인 초기화                                                        |
+| `lcd_init()`          | LCD 초기화                                                        |
+| `lcd_clear()`         | LCD 화면 클리어                                                  |
+| `lcd_print()`         | 점수 출력                                                       |
+| `play_mp3()`          | 배경음악 실행                                                    |
+| `sonar_read()`        | 초음파를 이용하여 물체 감지 및 점수 처리                                   |
+| `sonar()`             | 초음파 관련 스레드 3초 후에 다시 초음파 측정                                |
+| `myTone()`            | 점수 획득 시 버저 음 재생                                           |
+| `reset()`             | 점수 초기화 및 음악 다시 재생하는 스레드                                           |
+| `led()`               | 점수 획득 시 LED 점멸등                                             |
+| `execute_servo()`     | 서보모터 제어 명령 전달하는 스레드                                           |
+| `main()`             | 메인 함수                                                  |
 
-배경음악을 담당하는 코드를
-int init_audio();
-void* play_audio_thread(void* arg);
-void cleanup_audio();
-다음과 같이 구성하였습니다.
+### 주요 함수 (survo.c)
 
-초음파센서를 담당하는 코드를
-void *sonar(void *arg);
-void sonar_read();
-void sonar_read_m();
-다음과 같이 구현하였고,
+| 함수 이름              | 설명                                                                 |
+|-----------------------|--------------------------------------------------------------------|
+| `init()`              | 전반적인 초기화                                                        |
+| `init_servo()`          | 서보모터 초기화                                                        |
+| `rotate_Servo()`         | 서보모터 회전                                                 |
+| `servo()`         | 서보모터 스레드                                                       |
+| `main()`         | 메인 함수                                                       |
 
-서보모터의 경우
-void* execute_survo(void* arg); 코드를 를 통해 다른 라즈베리파이로 명령을 보내 서보모터를 실행하도록 구성하였습니다.
+---
 
-수동버저는
-void myTone();
-함수를 통해 구현되고
+## 주요 코드
 
-점수 획득을 시각적을 보여주는 LED의 경우
-void led();
-함수를 사용하게 됩니다.
+### 서보모터 제어코드 (survo.c)
 
-
--서보모터-
-서보모터의 경우 별도의 servo.c 파일로 구성해서 다른 라즈베리파이에서 담당하도록 구현하였습니다. 이는 한 대의 파이에서 구동하기에는 GPIO PIN의 부족 문제와 전력 부족 문제때문입니다.
-
-서보모터의 실행을 담당하는 코드는 다음과 같습니다.
+- 초음파 스레드
 ```c
-void init_servo() {
-    pinMode(SERVO, PWM_OUTPUT);
-    pwmSetMode(PWM_MODE_MS);
-    pwmSetRange(2000);
-    pwmSetClock(192);
-}
+    void *servo(void *arg) {
+        while (1) {
+            rotate_Servo(0.);
+            delay(1000);
+            rotate_Servo(90.);
+            delay(1000);
+            rotate_Servo(0.);
+            delay(1000);
+            rotate_Servo(-90.);
+            delay(1000);
+        }
+        return NULL;
+    }
 ```
 
-표준 서보모터의 설정값인, PWM 동작모드는 마크-스페이스 모드, 듀티 사이클은 2,000에 클럭은 50Hz입니다.
+- PWM 설정 :
+    ```c
+    void init_servo() {
+        printf("init servo \n");
+        pinMode(SERVO, PWM_OUTPUT);
+        pwmSetMode(PWM_MODE_MS);
+        pwmSetRange(2000);
+        pwmSetClock(192);
+        //pwmWrite(SERVO, 150);
+    }
+  ```
 
-서보모터의 회전 코드는 하기 내용과 같습니다.
-```c
-void rotate_Servo(float angle){
-    if (angle > 90.0) {
-        angle = 90.0;
-    }
-    else if (angle < -90.0) {
-        angle = -90.0;
-    }
-    int rotate = (int)(angle * (100./90.)) + 150;
+- 서보모터 회전 :
+  ```c
+    void rotate_Servo(float angle){
+    
+    if (angle > 90.0) { printf("90도가 초과되었습니다 -> 90도로 조절합니다.\n"); angle = 90.0; }
+    else if (angle < -90.0) { printf("-90도 미만입니다. -> -90도로 조절합니다.\n"); angle = -90.0; }
+    
+    int rotate = (int)(angle * (100./90.)) + 150;  
+    //printf("%.4fms\n", ((float)rotate)/100.);
     pwmWrite(SERVO, rotate);
-}
-```
-해당 코드를 통해 서보모터 회전 각도를 -90도에서 +90도, 총 180도 내에서만 구동되도록 하였으며, 혹시 의도치않게 범위를 넘는 경우 이를 범위 내로 재 조정하도록 하였습니다.
-
-위 설정값을 바탕으로 게임 내에서 서보모터가 동작하는 코드는 다음과 같습니다.
-```c
-void *servo(void *arg) {
-    while (1) {
-        rotate_Servo(0.);
-        delay(1000);
-        rotate_Servo(90.);
-        delay(1000);
-        rotate_Servo(0.);
-        delay(1000);
-        rotate_Servo(-90.);
-        delay(1000);
     }
-    return NULL;
-}
-```
-서보모터의 회전이 1초 간격으로 0도 -> 90도 -> 0도 -> -90도 -> 0도로 해서 한번에 90도씩 회전하도록 하였습니다.
+  ```
 
+---
 
-이렇게 구동되도록 맞추어진 서보모터는,
-```c
-int main() {
-    init();
-    pthread_t servoThread; 
-    pthread_create(&servoThread, NULL, servo, NULL);
-    pthread_join(servoThread, NULL);
-    return 0;
-}
-```
+### 초음파 제어 코드
 
-해당 코드를 통해 서보모터 구동을 위한 스레드를 만든후에 구동되도록 하였습니다.
-
-이 서보모터는 
-해당 서보모터는 주 라즈베리파이에서 핀볼 코드 실행시 실행되는, 아래에 있는 execute_servo코드를 실행해서
-```c
-void* execute_survo(void* arg) {
-    int ret = system("sshpass -p 'qwerty' ssh -o StrictHostKeyChecking=no pi@192.168.43.106 'sudo /home/pi/survo/survo'");
-    return NULL;
-}
-```
-execute_servo를 통해서 동일 네트워크에 접속해있는 다른 라즈베리파이로 SSH 명령어를 보내서 다른 라즈베리파이의  /home/pi/survo/survo에 있는 코드를 실행하도록 하였습니다.
-이번 시연에서는 휴대폰에서 핫스팟을 켠 후 두 대의 파이를 한대의 핫스팟에 접속시켜서 동일 네트워크로 묶은 후에 명령을 보내는 방식을 사용하였습니다.
-
-
-
--1602 LCD-
-LCD와 라즈베리파이는 I2C 인터페이스로 연결되어 있으며, {무언갈 더 적고싶은데...}
-
-
-먼저 LCD의 화면을 초기화 하는 코드입니다.
-```c
-void lcd_clear(int fd_lcd) {
-    wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x01);
-    delay(2);
-}
-```
-
-LCD 초기화 명령이 실행되면, LCD에 0x01이라는, LCD의 초기화를 담당하는 명령을 보내서 화면을 초기화하게 됩니다.
-
-이렇게 초기화 하고 난 LCD에 점수를 기록하기 위해서는 화면 출력을 담당하는 별도의 코드가 필요한데, 이는 lcd_print()에서 담당하게 됩니다.
-하기 코드는 초기화 된 LCD에 화면 출력을 담당하는 코드입니다.
-```c
-void lcd_print(int fd_lcd, int score) {
-    char buffer[32];
-    snprintf(buffer, sizeof(buffer), "score: %d", score);
-    
-    lcd_clear(fd_lcd);
-    
-    const char* str = buffer;
-    while (*str) {
-                wiringPiI2CWriteReg8(fd_lcd, 0x40, *str++);
-        
-        usleep(500);
-    }
-}
-```
-
-{화면출력이 이루어지는 방식을 설명하도록}
-
-
--배경음악-
-게임이 시작되면 play_mp3()를 호출해서 배경음악이 재생되도록 하였습니다.
-배경음악 재생을 담당하는 코드는 다음과 같습니다.
-```c
-pid_t play_mp3_pid = -1; 
-void play_mp3() {
-    
-    if (play_mp3_pid > 0) {
-        printf("Stopping currently running play_mp3 process (PID: %d)...\n", play_mp3_pid);
-        if (kill(play_mp3_pid, SIGTERM) == -1) {  // 
-            perror("Failed to terminate existing play_mp3 process");
+- 초음파 스레드
+  ```c
+    void *sonar(void *arg) {
+        int dynamic_delay = 3000; //3s
+        int save_score;
+        while (1) {
+            save_score = score;
+            sonar_read();
+            if(save_score == score)//ball not pass 50ms
+                dynamic_delay =50;
+            else
+                dynamic_delay = 1000; //ball pass 3s
+            delay(dynamic_delay);
         }
-        waitpid(play_mp3_pid, NULL, 0);  // 
-        play_mp3_pid = -1;
+        return NULL;
     }
-
-    pid_t pid = fork();
-
-    if (pid == 0) {  
-        setenv("XDG_RUNTIME_DIR", "/run/user/1000", 1); 
-        setenv("PATH", "/usr/bin:/bin:/usr/sbin:/sbin", 1);
-
-        //
-        if (geteuid() == 0) {
-            struct passwd *pw = getpwnam("pi");
-            if (!pw) {
-                perror("Failed to get user 'pi'");
-                exit(EXIT_FAILURE);
-            }
-            if (setuid(pw->pw_uid) == -1) {
-                perror("Failed to drop privileges");
-                exit(EXIT_FAILURE);
-            }
-        }
-
-        // ./play_mp3 
-        execl("./play_mp3", "play_mp3", NULL);
-        perror("Failed to execute ./play_mp3");
-        exit(EXIT_FAILURE);
-    } else if (pid > 0) {  
-        play_mp3_pid = pid;  
-        printf("Started play_mp3 process (PID: %d)\n", play_mp3_pid);
-    } else {
-        perror("Failed to fork");
-    }
-}
-```
-
-{배경음악이 재생되는 방식을 설명하도록}
-라즈베리파이 저장소에 저장된 별도의 play_mp3라는 파일을 불러들여서 재생되도록 하였습니다.
+  ```
 
 
-
--초음파 센서-
-초음파 센서의 종합적인 구동을 담당하는 코드는 다음과 같습니다.
-```c
-void *sonar(void *arg) {
-    int dynamic_delay = 3000; //3s
-    int save_score;
-    while (1) {
-        save_score = score;
-        sonar_read();
-        if(save_score == score)//ball not pass 50ms
-            dynamic_delay =50;
-        else
-            dynamic_delay = 1000; //ball pass 3s
-        delay(dynamic_delay);
-    }
-    return NULL;
-}
-```
-{종합적인 구동 설명}
-
-여기서 초음파 센서에서 물체의 감지를 담 sonar_read()를 담당하는 코드는 다음과 같습니다.
-```c
-void sonar_read() {
-    power_error=0;
-    pthread_mutex_lock(&gpio_mutex);
-    digitalWrite(TRIG_PIN, HIGH);
-    usleep(20); // 10 마이크로초 대기
-    digitalWrite(TRIG_PIN, LOW);
-
-     long timeout = micros() + 20000; // 20ms 
-    while (digitalRead(ECHO_PIN) == LOW && micros() < timeout);
-
-    if (micros() >= timeout) {
-        printf("Timeout waiting for ECHO_PIN to go HIGH\n");
-        power_error=1;
-        //return;
-    }
-
-    long start_time = micros();
-    timeout = micros() + 20000; // 20ms
-    while (digitalRead(ECHO_PIN) == HIGH && micros() < timeout);
-
-    if (micros() >= timeout) {
-        printf("Timeout waiting for ECHO_PIN to go LOW\n");
-        power_error=1;
-        //return;
-    }
-
-    long travel_time = micros() - start_time;
-
-    int distance = travel_time / 58; // cm
-
-    printf("sonar read %d\n", distance);
-
-    if(power_error==1) {
-        distance = 100;
-        printf("power error\n");
-    }
-
-    if(distance<=2) distance = 100;
-
-    pthread_mutex_unlock(&gpio_mutex);
-    if (distance <= 6) { // 5cm 이내에 물체가 인식되면
-
-        pthread_mutex_lock(&score_mutex); // 뮤텍스 잠금
-        score++; // 점수 증가
-        lcd_print(fd_lcd, score);
-        printf("Score: %d\n", score);//밖으로 빼도 되긴함
-        pthread_mutex_unlock(&score_mutex); // 뮤텍스 잠금 해제
-
-        
-        led();
-        myTone();
-
-    }
-}
-```
-{sonar read와 관련된 설명, 초음파센서가 어떻게 물체를 감지하는지 등등
-
- 하기 내용은 아직 정리가 안된 부분이지만 일단 적어둠
-
-
-
-    점수가 오르는 기준은 초음파 센서에서 5CM 이내에 물체가 인식되는지를 확인하는 방식입니다.
-    만약 5CM이내에서 물체가 인식이 되는 경우(distance <= 6)
-
-먼저 다른 프로세스에 의해서 점수가 의도치않게 변동되는 것을 막기 위해서 점수에 뮤텍스 잠금을 걸어서 다른 프로세스의 개입을 차단하도록 하였습니다.
-        pthread_mutex_lock(&score_mutex); 
-개입 차단후에 점수를 1점 올리고(score++)
-1602 LCD 화면을 현재의 점수 값에 맞게 갱신하고 (lcd_print(fd_lcd, score)); )
-점수 뮤텍스의 잠금을 해제하고 (pthread_mutex_unlock(&score_mutex);) 
-LED가 점등되고 수동 버저에서 소리가 재생되도록 하였습니다. (led(); myTone();)
-
-}
-
-
-
--LED-
-LED의 점멸을 담당하는 코드는 다음과 같습니다.
-```c
-void led() {
-    if (ledflag == 0)
-    {
-        digitalWrite(LED, HIGH);
-        ledflag = 1;
-    }
-    else {
-        digitalWrite(LED, LOW);
-        ledflag = 0;
-    }
-```
+- 초음파 제어 처리
+  ```c
+    void sonar_read() {
+        power_error=0;
+        pthread_mutex_lock(&gpio_mutex);
+        //초음파 신호 발사 
+        //printf("%d\n",testcnt++);
+        digitalWrite(TRIG_PIN, HIGH);
+        usleep(20); // 10 마이크로초 대기
+        digitalWrite(TRIG_PIN, LOW);
     
-해당 코드를 통해서 LED의 Flag를 조절하는 방식으로 점수 획득에 대한 시각적인 효과를 제공하도록 구성하였습니다.
-
-
--수동버저-
-점수 획득시 수동버저가 울리도록 담당한 코드는 다음과 같습니다.
-```c
-void myTone() {
-    softToneWrite(BUZZER, 440);
-    delay(500);
-    softToneWrite(BUZZER, 0);
-}
-```
-myTone()이 호출(점수의 상승)되는 경우, 440Hz의 소리가 재생되도록 하였습니다.
-
-
-
--재설정-
-재설정을 담당하는 코드는 다음과 같습니다.
-```c
-void *reset(void *arg) {
-    //static pthread_t audioThread;
-
-    while(1) {
-        if (digitalRead(RESET_BUTTON_PIN) == LOW) {
-            printf("Reset button pressed\n");
-            play_mp3();
-
-            pthread_mutex_lock(&score_mutex);
-            score = 0;
+         long timeout = micros() + 20000; // 20ms 
+        while (digitalRead(ECHO_PIN) == LOW && micros() < timeout);
+    
+        if (micros() >= timeout) {
+            printf("Timeout waiting for ECHO_PIN to go HIGH\n");
+            power_error=1;
+            //return;
+        }
+    
+        long start_time = micros();
+        timeout = micros() + 20000; // 20ms
+        while (digitalRead(ECHO_PIN) == HIGH && micros() < timeout);
+    
+        if (micros() >= timeout) {
+            printf("Timeout waiting for ECHO_PIN to go LOW\n");
+            power_error=1;
+            //return;
+        }
+    
+        long travel_time = micros() - start_time;
+    
+        int distance = travel_time / 58; // cm
+    
+        printf("sonar read %d\n", distance);
+    
+        if(power_error==1) {
+            distance = 100;
+            printf("power error\n");
+        }
+    
+        if(distance<=2) distance = 100;
+    
+        pthread_mutex_unlock(&gpio_mutex);
+        if (distance <= 6) { // 5cm 이내에 물체가 인식되면
+    
+            pthread_mutex_lock(&score_mutex); // 뮤텍스 잠금
+            score++; // 점수 증가
             lcd_print(fd_lcd, score);
-            pthread_mutex_unlock(&score_mutex);
-
-            printf("reset\n");
-            delay(500);
+            printf("Score: %d\n", score);//밖으로 빼도 되긴함
+            pthread_mutex_unlock(&score_mutex); // 뮤텍스 잠금 해제
+            
+            led();
+            myTone();
+    
         }
-        delay(50);
     }
-}
+  ```
+
+---
+
+### LCD 관련 코드
+
+- LCD 초기화
+  ```c
+    void lcd_init(int fd_lcd, int fd_rgb, int r, int g, int b) {
+    
+        // Initialize RGB
+        wiringPiI2CWriteReg8(fd_rgb, 0x00, 0x00); // Initialization
+    
+        wiringPiI2CWriteReg8(fd_rgb, 0x01, 0x00); // Initialization
+        wiringPiI2CWriteReg8(fd_rgb, 0x08, 0xAA); // RGB activation
+    
+        wiringPiI2CWriteReg8(fd_rgb, 0x04, r); // RED
+        wiringPiI2CWriteReg8(fd_rgb, 0x03, g); // GREEN
+        wiringPiI2CWriteReg8(fd_rgb, 0x02, b); // BLUE
+    
+        // Initialize LCD
+        wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x38); // Function set: 2 lines
+        wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x39); // Function set: Extend instruction set
+        wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x14); // OSC frequency
+        wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x70); // Contrast setting
+        wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x56); // Power/ICON control
+        wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x6C); // Follower control
+        wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x0C); // Display ON
+        wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x01); // Clear display
+        usleep(2000);
+    }
+  ```
+
+- LCD 화면 클리어
+  ```c
+      void lcd_clear(int fd_lcd) {
+        wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x01);
+        delay(2);
+    }
+  ```
+
+- LCD 화면 출력
+  ```c
+    void lcd_print(int fd_lcd, int score) {
+        char buffer[32];
+        snprintf(buffer, sizeof(buffer), "score: %d", score);
+        
+        lcd_clear(fd_lcd);
+    
+        // Print the formatted string to the LCD
+        const char* str = buffer;
+        while (*str) {
+                    wiringPiI2CWriteReg8(fd_lcd, 0x40, *str++);
+            
+            usleep(500);
+        }
+    }
+  ```
+
+---
+
+### 스피커 관련 코드
+
+- 스피커
+  ```c
+    void play_mp3() {
+        
+        if (play_mp3_pid > 0) {
+            printf("Stopping currently running play_mp3 process (PID: %d)...\n", play_mp3_pid);
+            if (kill(play_mp3_pid, SIGTERM) == -1) {  // 
+                perror("Failed to terminate existing play_mp3 process");
+            }
+            waitpid(play_mp3_pid, NULL, 0);  // 
+            play_mp3_pid = -1;
+        }
+    
+        pid_t pid = fork();
+    
+        if (pid == 0) {  
+            setenv("XDG_RUNTIME_DIR", "/run/user/1000", 1); 
+            setenv("PATH", "/usr/bin:/bin:/usr/sbin:/sbin", 1);
+    
+            //
+            if (geteuid() == 0) {
+                struct passwd *pw = getpwnam("pi");
+                if (!pw) {
+                    perror("Failed to get user 'pi'");
+                    exit(EXIT_FAILURE);
+                }
+                if (setuid(pw->pw_uid) == -1) {
+                    perror("Failed to drop privileges");
+                    exit(EXIT_FAILURE);
+                }
+            }
+    
+            // ./play_mp3 
+            execl("./play_mp3", "play_mp3", NULL);
+            perror("Failed to execute ./play_mp3");
+            exit(EXIT_FAILURE);
+        } else if (pid > 0) {  
+            play_mp3_pid = pid;  
+            printf("Started play_mp3 process (PID: %d)\n", play_mp3_pid);
+        } else {
+            perror("Failed to fork");
+        }
+    }
+  ```
+
+---
+
+### 서보모터 실행 코드
+
+- 서보모터 실행하는 코드를 제어 명령 전달
+  ```c
+    void* execute_survo(void* arg) {
+    
+        //rsa error 
+        int ret = system("sshpass -p 'qwerty' ssh -o StrictHostKeyChecking=no pi@192.168.43.106 'sudo /home/pi/survo/survo'");      //ip는 경우에 따라 바뀜
+        if (ret != 0) {
+            printf("Error: Failed to execute survo (return code: %d)\n", ret);
+        } else {
+            printf("survo executed successfully.\n");
+        }
+        //survo terminate
+        //system("ssh pi@192.168.0.26 'pkill -f /home/pi/survo/survo'");
+        return NULL;
+    }
+  ```
+
+---
+
+### 그외 코드
+
+- 부저 소리
+  ```c
+    void myTone() {
+        softToneWrite(BUZZER, 440);
+        delay(500);
+        softToneWrite(BUZZER, 0);
+    }
+  ```
+
+- 리셋 버튼 관련
+  ```c
+    void *reset(void *arg) {
+    
+        while(1) {
+            if (digitalRead(RESET_BUTTON_PIN) == LOW) {
+                printf("Reset button pressed\n");
+                play_mp3();
+            
+    
+                pthread_mutex_lock(&score_mutex);
+                score = 0; // 점수 리셋
+                lcd_print(fd_lcd, score);
+                pthread_mutex_unlock(&score_mutex);
+    
+                printf("reset\n");
+                delay(500); // 버튼이 눌린 동안 대기
+            }
+            delay(50);
+        }
+    }
+  ```
+
+  - LED 관련
+ ```c
+    void led() {
+    
+        if (ledflag == 0)
+        {
+            digitalWrite(LED, HIGH);
+            ledflag = 1;
+        }
+        else {
+            digitalWrite(LED, LOW);
+            ledflag = 0;
+        }
+        
+    }
 ```
-(digitalRead(RESET_BUTTON_PIN) == LOW)를 통해서 버튼이 눌린것을 감지하면, play_mp3();를 통해서 배경음악 재생 함수를 호출해서 배경음악이 처음부터 재생되도록 하였고,        
-pthread_mutex_lock(&score_mutex);를 통해서 점수에 뮤텍스 잠금을 걸고, score = 0;을 통해서 점수를 0점으로 설정하고, lcd_print(fd_lcd, score);를 통해서 갱신 된 점수가 LCD에 표기되도록 하고 마지막으로 pthread_mutex_unlock(&score_mutex);를 통해서 점수 뮤텍스에 걸려 있던 잠금을 해제하도록 하였습니다. 
-점수에 뮤텍스 잠금을 걸고, 점수를 0점으로 초기화 하고 LCD에 표시되는 점수를 현재 점수의 값(0점)에 맞게 갱신하고 점수 뮤텍스의 잠금을 해제하도록 구성하였습니다.
-이를 통해서 점수가 초기화 되는 과정에서 다른 변수가 점수에 개입되는것을 막아 0점의 무결성이 유지되도록 하였습니다.
 
+---
 
+### 메인 함수
 
--종합-
-```c
-int main() {
-    init();
-    play_mp3();
-    pthread_t sonarThread, buttonThread, resetThread, servoThread; //audioThread;
+- survo.c 에서의 메인함수
+  ```c
+    int main() {
+        init();
+        
+        pthread_t servoThread; 
+        
+        pthread_create(&servoThread, NULL, servo, NULL);
     
-    pthread_create(&sonarThread, NULL, sonar, NULL);
-    pthread_create(&resetThread, NULL, reset, NULL);
-    pthread_join(sonarThread, NULL);
-    pthread_join(servoThread, NULL);
-    pthread_join(resetThread, NULL);
-
+        pthread_join(servoThread, NULL);
     
-    pthread_mutex_destroy(&score_mutex);
-    pthread_mutex_destroy(&audio_mutex);
+        return 0;
+    }
+  ```
+
+- test.c 에서의 메인 함수
+  ```c
+    int main() {
+        init();
+        play_mp3();
+        
+        pthread_t sonarThread, buttonThread, resetThread, servoThread;
     
-    return 0;
-}
-```
+        // Create threads
+        pthread_create(&sonarThread, NULL, sonar, NULL);
+        pthread_create(&resetThread, NULL, reset, NULL);
+    
+        // Join threads (this ensures the program waits for threads to complete before terminating)
+        pthread_join(sonarThread, NULL);
+        pthread_join(servoThread, NULL);
+        pthread_join(resetThread, NULL);
+    
+        // Cleanup
+        pthread_mutex_destroy(&score_mutex);
+        pthread_mutex_destroy(&audio_mutex);
+    
+        return 0;
+    }
+  ```
+  
+---
 
-Main함수 구성은 다음과 같습니다.
-코드가 실행되면, 초음파 센서를 사용하는 sonar, 리셋 버튼을 처리하는 reset 같은 작업들을 실행할 각각의 스레드를 만들어서 실행합니다. 
+## 한계 및 개선 사항
 
-이렇게 만든 스레드들은 동시에 동작하며 서로 간섭하지 않고 독립적으로 실행됩니다. 마지막으로 프로그램이 종료되기 전, 사용한 뮤텍스를 정리하여 프로그램이 깔끔하게 마무리되도록 합니다.
+- 한계
+1. **게임판 크기 제한**: 현실적인 보관 문제로 인해 게임판 크기를 제한.
+2. **초음파 센서 오작동**: 반사파로 인해 점수 오작동 가능성 존재.
+3. **충격 센서 사용 중단**: 외부 충격과의 구분이 어려워 제외.
+4. **모터 가격 문제**: 발사대 및 플리퍼에 충분한 힘을 제공하기 위해 수동 방식을 채택.
+
+- 개선사항
+1. 서보모터의 작동 방식을 **ssh 방식 대신 UART 사용**을 사용하여서 개선해야 할 것.
 
 
-
-
+---
 
 
 최종발표에 사용된 프레젠테이션 파일은 
