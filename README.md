@@ -121,8 +121,10 @@ execute_servo를 통해서 동일 네트워크에 접속해있는 다른 라즈�
 이번 실습에서는 휴대폰에서 핫스팟을 켠 후 두 대의 파이를 한대의 핫스팟에 접속시켜서 동일 네트워크로 묶은 후에 명령을 보내는 방식을 사용하였습니다.
 
 
+
 -1602 LCD-
 LCD와 라즈베리파이는 I2C 인터페이스로 연결되어 있으며, 
+
 
 먼저 LCD의 화면을 초기화 하는 코드입니다.
 
@@ -133,7 +135,8 @@ void lcd_clear(int fd_lcd) {
 
 LCD 초기화 명령이 실행되면, LCD에 0x01이라는, LCD의 초기화를 담당하는 명령을 보내서 화면을 초기화하게 됩니다.
 
-LCD의 화면 출력을 담당하는 코드입니다.
+
+하기 코드는 초기화 된 LCD에 화면 출력을 담당하는 코드입니다.
 
 void lcd_print(int fd_lcd, int score) {
     char buffer[32];
@@ -149,10 +152,13 @@ void lcd_print(int fd_lcd, int score) {
     }
 }
 
+{화면출력이 이루어지는 방식을 설명하도록}
 
 
+-배경음악-
+게임이 시작되면 play_mp3()를 호출해서 배경음악이 재생되도록 하였습니다.
 배경음악 재생을 담당하는 코드는 다음과 같습니다.
-라즈베리파이 저장소에 저장된 별도의 play_mp3라는 파일을 불러들여서 재생되도록 하였습니다.
+
 pid_t play_mp3_pid = -1; 
 void play_mp3() {
     
@@ -183,7 +189,8 @@ void play_mp3() {
                 exit(EXIT_FAILURE);
             }
         }
- 
+
+        // ./play_mp3 
         execl("./play_mp3", "play_mp3", NULL);
         perror("Failed to execute ./play_mp3");
         exit(EXIT_FAILURE);
@@ -195,11 +202,32 @@ void play_mp3() {
     }
 }
 
-int testcnt=0;
-int power_error=0;
+{배경음악이 재생되는 방식을 설명하도록}
+라즈베리파이 저장소에 저장된 별도의 play_mp3라는 파일을 불러들여서 재생되도록 하였습니다.
 
 
 
+-초음파 센서-
+초음파 센서의 종합적인 구동을 담당하는 코드는 다음과 같습니다.
+
+void *sonar(void *arg) {
+    int dynamic_delay = 3000; //3s
+    int save_score;
+    while (1) {
+        save_score = score;
+        sonar_read();
+        if(save_score == score)//ball not pass 50ms
+            dynamic_delay =50;
+        else
+            dynamic_delay = 1000; //ball pass 3s
+        delay(dynamic_delay);
+    }
+    return NULL;
+}
+
+{종합적인 구동 설명}
+
+여기서 초음파 센서에서 물체의 감지를 담 sonar_read()를 담당하는 코드는 다음과 같습니다.
 
 void sonar_read() {
     power_error=0;
@@ -207,12 +235,14 @@ void sonar_read() {
     digitalWrite(TRIG_PIN, HIGH);
     usleep(20); // 10 마이크로초 대기
     digitalWrite(TRIG_PIN, LOW);
+
      long timeout = micros() + 20000; // 20ms 
     while (digitalRead(ECHO_PIN) == LOW && micros() < timeout);
 
     if (micros() >= timeout) {
         printf("Timeout waiting for ECHO_PIN to go HIGH\n");
         power_error=1;
+        //return;
     }
 
     long start_time = micros();
@@ -230,7 +260,6 @@ void sonar_read() {
     int distance = travel_time / 58; // cm
 
     printf("sonar read %d\n", distance);
-  
 
     if(power_error==1) {
         distance = 100;
@@ -239,8 +268,28 @@ void sonar_read() {
 
     if(distance<=2) distance = 100;
 
-    pthread_mutex_unlock(&gpio_mutex)
-    
+    pthread_mutex_unlock(&gpio_mutex);
+    if (distance <= 6) { // 5cm 이내에 물체가 인식되면
+
+        pthread_mutex_lock(&score_mutex); // 뮤텍스 잠금
+        score++; // 점수 증가
+        lcd_print(fd_lcd, score);
+        printf("Score: %d\n", score);//밖으로 빼도 되긴함
+        pthread_mutex_unlock(&score_mutex); // 뮤텍스 잠금 해제
+
+        
+        led();
+        myTone();
+
+    }
+}
+
+{sonar read와 관련된 설명, 초음파센서가 어떻게 물체를 감지하는지 등등
+
+ 하기 내용은 아직 정리가 안된 부분이지만 일단 적어둠
+
+
+
     점수가 오르는 기준은 초음파 센서에서 5CM 이내에 물체가 인식되는지를 확인하는 방식입니다.
     만약 5CM이내에서 물체가 인식이 되는 경우(distance <= 6)
 
@@ -251,23 +300,12 @@ void sonar_read() {
 점수 뮤텍스의 잠금을 해제하고 (pthread_mutex_unlock(&score_mutex);) 
 LED가 점등되고 수동 버저에서 소리가 재생되도록 하였습니다. (led(); myTone();)
 
-// 초음파 센서
-void *sonar(void *arg) {
-    int dynamic_delay = 3000; //3s
-    int save_score;
-    while (1) {
-        save_score = score;
-        sonar_read();
-        if(save_score == score)//ball not pass 50ms
-            dynamic_delay =50;
-        else
-            dynamic_delay = 1000; //ball pass 3s
-        delay(dynamic_delay);
-    }
-    return NULL;
 }
 
-초음파 센서에서 물체를 감지하는 경우
+
+
+-LED-
+LED의 점멸을 담당하는 코드는 다음과 같습니다.
 
 void led() {
     if (ledflag == 0)
@@ -279,24 +317,54 @@ void led() {
         digitalWrite(LED, LOW);
         ledflag = 0;
     }
- 
+    
 해당 코드를 통해서 LED의 Flag를 조절하는 방식으로 점수 획득에 대한 시각적인 효과를 제공하도록 구성하였습니다.
 
-void myTone()에서 점수값에 변동(점수의 상승)이 있을 때, softToneWrite(BUZZER, 440);를 통해서 440Hz의 소리가 재생되도록 하였습니다.
 
-재설정 버튼은 하기 제시된 *reset에서 담당하게 되는데, 
+-수동버저-
+점수 획득시 수동버저가 울리도록 담당한 코드는 다음과 같습니다.
+
+void myTone() {
+    softToneWrite(BUZZER, 440);
+    delay(500);
+    softToneWrite(BUZZER, 0);
+}
+
+myTone()이 호출(점수의 상승)되는 경우, 440Hz의 소리가 재생되도록 하였습니다.
+
+
+
+-재설정-
+재설정을 담당하는 코드는 다음과 같습니다.
+
 void *reset(void *arg) {
-    while(1) {
-        if (digitalRead(RESET_BUTTON_PIN) == LOW)를 통해서 버튼이 눌린것을 감지하면, play_mp3();를 통해서 배경음악 재생 함수를 호출해서 배경음악이 처음부터 재생되도록 하였고, 
-음악을 처음부터 재생해도록 하였고
+    //static pthread_t audioThread;
 
-        
+    while(1) {
+        if (digitalRead(RESET_BUTTON_PIN) == LOW) {
+            printf("Reset button pressed\n");
+            play_mp3();
+
+            pthread_mutex_lock(&score_mutex);
+            score = 0;
+            lcd_print(fd_lcd, score);
+            pthread_mutex_unlock(&score_mutex);
+
+            printf("reset\n");
+            delay(500);
+        }
+        delay(50);
+    }
+}
+
+(digitalRead(RESET_BUTTON_PIN) == LOW)를 통해서 버튼이 눌린것을 감지하면, play_mp3();를 통해서 배경음악 재생 함수를 호출해서 배경음악이 처음부터 재생되도록 하였고,        
 pthread_mutex_lock(&score_mutex);를 통해서 점수에 뮤텍스 잠금을 걸고, score = 0;을 통해서 점수를 0점으로 설정하고, lcd_print(fd_lcd, score);를 통해서 갱신 된 점수가 LCD에 표기되도록 하고 마지막으로 pthread_mutex_unlock(&score_mutex);를 통해서 점수 뮤텍스에 걸려 있던 잠금을 해제하도록 하였습니다. 
-를
 점수에 뮤텍스 잠금을 걸고, 점수를 0점으로 초기화 하고 LCD에 표시되는 점수를 현재 점수의 값(0점)에 맞게 갱신하고 점수 뮤텍스의 잠금을 해제하도록 구성하였습니다.
 이를 통해서 점수가 초기화 되는 과정에서 다른 변수가 점수에 개입되는것을 막아 0점의 무결성이 유지되도록 하였습니다.
 
 
+
+-종합-
 
 int main() {
     init();
