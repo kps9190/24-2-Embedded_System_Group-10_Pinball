@@ -285,7 +285,9 @@
     }
   ```
 
-- 1602 LCD 화면 클리어
+
+
+- 1602 LCD 화면 초기화
   ```c
       void lcd_clear(int fd_lcd) {
         wiringPiI2CWriteReg8(fd_lcd, 0x80, 0x01);
@@ -311,6 +313,8 @@
         }
     }
   ```
+LCD에 점수를 출력하도록 하는 코드입니다. 먼저 buffer에 "score: "이라는 양식을 저장해두고, score 뒷부분에 %d라는 변수를 두고 %d값이 score를 나타내도록 합니다. 
+그 뒤로 lcd_clear를 통해 화면을 초기화한 이후 buffer에서 빈 글자가 인식될 때까지 하나씩 읽고 이를 lcd에 데이터모드(0x40)로 전송합니다.
 
 ---
 
